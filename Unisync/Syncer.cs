@@ -41,7 +41,7 @@ namespace Unisync
 			_watcher?.Dispose();
 
 			_option = option;
-			SyncWatcherIdentification swId = new(_option.Value.Tag, _option.Value.Group);
+			SyncWatcherIdentification swId = new(_option.Value.Tag);
 			_watcher = new SyncWatcher(swId, _pushJob);
 			_watcher.Start(_option.Value);
 		}

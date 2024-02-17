@@ -1,7 +1,5 @@
-﻿using System.Diagnostics;
-using System.Text.RegularExpressions;
+﻿using Newtonsoft.Json;
 using Serilog;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Unisync
 {
@@ -9,78 +7,92 @@ namespace Unisync
 	{
 		private static readonly string CONFIG_PATH = "unisyncd.conf";
 		private const string LOG_TEMPLATE = "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] {Message:lj}{NewLine}{Exception}";
+		private static Config? _config;
+
 		static void Main(string[] args)
 		{
-
-			//var extension = Path.GetExtension(@"test - 복사본 (4).cs~RF1ced133.TMP");
-   //         Console.WriteLine(extension);
-
-			//string fileA = $@"C:\\TestDirSrc\big1.cs";
-			//string fileB = $@"C:\\TestDirSrc\big2.cs";
-
-			string fileA = $@"C:\\TestDirSrc\small1.txt";
-			string fileB = $@"C:\\TestDirSrc\small2.txt";
-
-			//const int TestCount = 1000;
-
-			//Stopwatch sw = new Stopwatch();
-			//sw.Restart();
-			//for (int i = 0; i < TestCount; i++)
-			//{
-			//	if (!FileManager.CompareBigFiles(fileA, fileB))
-			//	{
-   //                 //Console.WriteLine("ERROR");
-   //             }
-			//}
-   //         Console.WriteLine(sw.ElapsedMilliseconds);
-
-   //         Console.WriteLine();
-
-   //         sw.Restart();
-			//for (int i = 0; i < TestCount; i++)
-			//{
-			//	if (!FileManager.CompareSmallFiles(fileA, fileB))
-			//	{
-			//		//Console.WriteLine("ERROR");
-			//	}
-			//}
-			//Console.WriteLine(sw.ElapsedMilliseconds);
-
-
 			// Initialize serilog file logger
 			Log.Logger = new LoggerConfiguration()
-#if DEBUG
 				.WriteTo.Console(outputTemplate: LOG_TEMPLATE)
 				.CreateLogger();
-#else
-				.WriteTo.File("unisync.log",
-							  rollingInterval: RollingInterval.Infinite,
-							  outputTemplate: LOG_TEMPLATE,
-							  fileSizeLimitBytes: 1024 * 1024 * 4, // 4mb
-							  retainedFileCountLimit: 5,
-							  rollOnFileSizeLimit: true)
-				.CreateLogger();
-#endif
 
-			Syncer syncer = new Syncer("TestGroup");
-			SyncOption option = new()
+			string currentDirectory = Directory.GetCurrentDirectory();
+			string configPath = Path.Combine(currentDirectory, CONFIG_PATH);
+
+			if (!File.Exists(configPath))
 			{
-				Tag = "TestSync",
-				SourcePath = @"C:\\TestDirSrc",
-				TargetPath = @"C:\\TestDirDest",
-				IncludeExtensionFilters = new()
-				{
-					".cs"
-				},
-				DiffCheckIntervalSec = 0,
-			};
-			syncer.Start(option);
+				createDefaultOption(configPath);
+				return;
+			}
+
+			string config = File.ReadAllText(CONFIG_PATH);
+			_config = JsonConvert.DeserializeObject<Config>(config);
+
+			if (_config == null )
+			{
+				createDefaultOption(configPath);
+				return;
+			}
+
+			if (_config.LogToFile)
+			{
+				Log.Logger = new LoggerConfiguration()
+					.WriteTo.Console(outputTemplate: LOG_TEMPLATE)
+					.WriteTo.File("unisync.log",
+								  rollingInterval: RollingInterval.Infinite,
+								  outputTemplate: LOG_TEMPLATE,
+								  fileSizeLimitBytes: 1024 * 1024 * 4, // 4mb
+								  retainedFileCountLimit: 5,
+								  rollOnFileSizeLimit: true)
+					.CreateLogger();
+			}
+
+			List<Syncer> syncers = new List<Syncer>();
+
+			Log.Information($"Initialize syncer by configuration...");
+
+			foreach (SyncOption option in _config.options)
+			{
+				Syncer syncer = new Syncer(option.Group);
+				syncer.Start(option);
+				syncers.Add(syncer);
+			}
+
+			Log.Information($"Start Unisyncer");
 
 			while (true)
 			{
 				Thread.Sleep(100);
-				syncer.OnProcessTick();
+				foreach (var syncer in syncers)
+				{
+					syncer.OnProcessTick();
+				}
 			}
+		}
+
+		private static void createDefaultOption(string configPath)
+		{
+			_config = new Config();
+			SyncOption optionFormat = new()
+			{
+				Group = "Test Group",
+				Tag = "TestSync",
+				SourcePath = @"C:\\TestDirSrc",
+				TargetPath = @"C:\\TestDirDest",
+				IncludeExtensionFilters = new()
+					{
+						".cs"
+					},
+				DiffCheckIntervalSec = 0,
+			};
+			_config.options.Add(optionFormat);
+
+			string configData = JsonConvert.SerializeObject(_config);
+			File.WriteAllText(configPath, configData);
+
+			Log.Warning($"There is no configuration at : {configPath}");
+			Log.Information($"Create default configuration file.");
+			Log.Information($"Try again when it's fill up.");
 		}
 	}
 }

@@ -2,9 +2,9 @@
 {
 	public struct SyncOption
 	{
-		public string Tag { get; set; } = string.Empty;
-
 		public string Group { get; set; } = string.Empty;
+
+		public string Tag { get; set; } = string.Empty;
 
 		public string SourcePath { get; set; } = string.Empty;
 
@@ -30,15 +30,15 @@
 		/// </summary>
 		public int RetryCount { get; set; } = 10;
 
-		/// <summary>
-		/// 대상 폴더의 이동이나 이름 변경을 추적하고, 설정에 기록합니다.
-		/// </summary>
-		public bool AllowTargetPathChange { get; set; } = true;
+		///// <summary>
+		///// 대상 폴더의 이동이나 이름 변경을 추적하고, 설정에 기록합니다.
+		///// </summary>
+		//public bool AllowTargetPathChange { get; set; } = true;
 
-		/// <summary>
-		/// 원본 폴더의 이동이나 이름 변경을 추적하고, 설정에 기록합니다.
-		/// </summary>
-		public bool AllowSourcePathChange { get; set; } = true;
+		///// <summary>
+		///// 원본 폴더의 이동이나 이름 변경을 추적하고, 설정에 기록합니다.
+		///// </summary>
+		//public bool AllowSourcePathChange { get; set; } = true;
 
 		public SyncOption()
 		{
