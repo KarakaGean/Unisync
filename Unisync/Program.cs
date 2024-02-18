@@ -8,6 +8,10 @@ namespace Unisync
 		private static readonly string CONFIG_PATH = "unisyncd.conf";
 		private const string LOG_TEMPLATE = "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff}] [{Level:u3}] {Message:lj}{NewLine}{Exception}";
 		private static Config? _config;
+		private static JsonSerializerSettings _serializerSettings = new JsonSerializerSettings()
+		{
+			Formatting = Formatting.Indented,
+		};
 
 		static void Main(string[] args)
 		{
@@ -26,7 +30,7 @@ namespace Unisync
 			}
 
 			string config = File.ReadAllText(CONFIG_PATH);
-			_config = JsonConvert.DeserializeObject<Config>(config);
+			_config = JsonConvert.DeserializeObject<Config>(config, _serializerSettings);
 
 			if (_config == null )
 			{
@@ -58,14 +62,21 @@ namespace Unisync
 				syncers.Add(syncer);
 			}
 
-			Log.Information($"Start Unisyncer");
+			Log.Information($"Start Unisync");
 
 			while (true)
 			{
 				Thread.Sleep(100);
 				foreach (var syncer in syncers)
 				{
-					syncer.OnProcessTick();
+					try
+					{
+						syncer.OnProcessTick();
+					}
+					catch (Exception ex)
+					{
+						Log.Fatal(ex.Message);
+					}
 				}
 			}
 		}
@@ -87,12 +98,13 @@ namespace Unisync
 			};
 			_config.options.Add(optionFormat);
 
-			string configData = JsonConvert.SerializeObject(_config);
+			string configData = JsonConvert.SerializeObject(_config, _serializerSettings);
 			File.WriteAllText(configPath, configData);
 
 			Log.Warning($"There is no configuration at : {configPath}");
 			Log.Information($"Create default configuration file.");
 			Log.Information($"Try again when it's fill up.");
-		}
+            Console.ReadLine();
+        }
 	}
 }

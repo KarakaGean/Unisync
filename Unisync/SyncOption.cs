@@ -30,6 +30,11 @@
 		/// </summary>
 		public int RetryCount { get; set; } = 10;
 
+		/// <summary>
+		/// 대상 폴더의 디렉토리가 비어있지 않은 경우 디렉토리를 보존합니다.
+		/// </summary>
+		public bool DeleletOnlyEmptyDirectory { get; set; } = false;
+
 		///// <summary>
 		///// 대상 폴더의 이동이나 이름 변경을 추적하고, 설정에 기록합니다.
 		///// </summary>

@@ -1,4 +1,6 @@
 ﻿using System.Collections.Concurrent;
+using System.ComponentModel.Design;
+using System.IO;
 using Microsoft.Extensions.FileSystemGlobbing;
 using Serilog;
 
@@ -266,8 +268,10 @@ namespace Unisync
 				return;
 			}
 
-			string sourcePath = _option.Value.SourcePath;
-			string targetPath = _option.Value.TargetPath;
+			SyncOption option = _option.Value;
+
+			string sourcePath = option.SourcePath;
+			string targetPath = option.TargetPath;
 
 			Queue<string> srcRetrieve = new();
 			srcRetrieve.Enqueue(sourcePath);
@@ -286,11 +290,17 @@ namespace Unisync
 
 				foreach (string dir in srcDirs)
 				{
+					if (!Global.Filter.CheckFileter(dir, isDirectory: true, ref option))
+						continue;
+
 					relativeSrcDirs.Add(Path.GetRelativePath(sourcePath, dir));
 					srcRetrieve.Enqueue(dir);
 				}
 				foreach (string file in srcFiles)
 				{
+					if (!Global.Filter.CheckFileter(file, isDirectory: false, ref option))
+						continue;
+
 					relativeSrcFiles.Add(Path.GetRelativePath(sourcePath, file));
 				}
 
@@ -308,22 +318,45 @@ namespace Unisync
 
 				foreach (string dir in tarDirs)
 				{
+					if (!Global.Filter.CheckFileter(dir, isDirectory: true, ref option))
+						continue;
+
 					relativeTarDirs.Add(Path.GetRelativePath(targetPath, dir));
 				}
 				foreach (string file in tarFiles)
 				{
+					if (!Global.Filter.CheckFileter(file, isDirectory: false, ref option))
+						continue;
+
 					relativeTarFiles.Add(Path.GetRelativePath(targetPath, file));
 				}
 
 				// Delete all files or directories that exist only in the target.
+
 				relativeTarDirs.ExceptWith(relativeSrcDirs);
 				relativeTarFiles.ExceptWith(relativeSrcFiles);
 
+				// Delete if it's not exist at the source side
 				foreach (string td in relativeTarDirs)
 				{
 					try
 					{
-						Directory.Delete(td, recursive: true);
+						// Ignore other directories
+						if (!Global.Filter.CheckFileter(td, isDirectory: true, ref option))
+							continue;
+
+						string delDirPath = Path.Combine(targetPath, td);
+						if (_option.Value.DeleletOnlyEmptyDirectory)
+						{
+							if (Directory.GetFiles(delDirPath).Length <= 0)
+							{
+								Directory.Delete(delDirPath, recursive: true);
+							}
+						}
+						else
+						{
+							Directory.Delete(delDirPath, recursive: true);
+						}
 					}
 					catch (Exception e)
 					{
@@ -335,7 +368,12 @@ namespace Unisync
 				{
 					try
 					{
-						File.Delete(fd);
+						// Ignore other files
+						if (!Global.Filter.CheckFileter(fd, isDirectory: false, ref option))
+							continue;
+
+						string delFilePath = Path.Combine(targetPath, fd);
+						File.Delete(delFilePath);
 					}
 					catch (Exception e)
 					{
@@ -344,20 +382,11 @@ namespace Unisync
 				}
 
 				// Copy or skip all files and directories if exits.
-				foreach (string srcDir in srcDirs)
-				{
-					string tarDir = Path.Combine(targetPath, Path.GetRelativePath(sourcePath, srcDir));
-					if (Directory.Exists(tarDir))
-						continue;
-
-					if (!FileManager.TryCopyDirectory(srcDir, tarDir, _warnOutput, shouldCopyFile, out Exception? e))
-					{
-						Log.Error($"[Group:{Group}] Check Diff target directory copy error!\nException: {e}");
-					}
-
-				}
 				foreach (string srcFile in srcFiles)
 				{
+					if (!Global.Filter.CheckFileter(srcFile, isDirectory: false, ref option))
+						continue;
+
 					string tarFile = Path.Combine(targetPath, Path.GetRelativePath(sourcePath, srcFile));
 					if (File.Exists(tarFile) && FileManager.CompareSmallFiles(srcFile, tarFile))
 						continue;
@@ -365,6 +394,18 @@ namespace Unisync
 					if (!FileManager.TryCopyFile(srcFile, tarFile, _warnOutput, out Exception? e))
 					{
 						Log.Error($"[Group:{Group}] Check Diff target file copy error!\nException: {e}");
+					}
+				}
+
+				// Create directory only
+				foreach (string srcDir in srcDirs)
+				{
+					if (!Global.Filter.CheckFileter(srcDir, isDirectory: true, ref option))
+						continue;
+					string tarDir = Path.Combine(targetPath, Path.GetRelativePath(sourcePath, srcDir));
+					if (!Directory.Exists(tarDir))
+					{
+						Directory.CreateDirectory(tarDir);
 					}
 				}
 			}

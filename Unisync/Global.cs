@@ -1,6 +1,4 @@
-﻿using Serilog;
-
-namespace Unisync
+﻿namespace Unisync
 {
 	public static class Global
 	{
