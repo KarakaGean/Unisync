@@ -1,7 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.ComponentModel.Design;
-using System.IO;
-using Microsoft.Extensions.FileSystemGlobbing;
 using Serilog;
 
 namespace Unisync
